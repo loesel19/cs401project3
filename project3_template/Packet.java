@@ -33,7 +33,7 @@ class Packet implements Serializable{
         peer_listen_port=-1;
         FILE_VECTOR=new char[64];
         Arrays.fill(FILE_VECTOR,'0');
-        DATA_BLOCK = new char[data_block_size];
+        DATA_BLOCK = new byte[data_block_size];
         //Arrays.fill(DATA_BLOCK,'0');
         
     }

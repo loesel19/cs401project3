@@ -11,7 +11,8 @@ public class Client {
 
      int serverPort;
      InetAddress ip=null; 
-     Socket s; 
+     Socket s;
+     ServerSocket clientListener; //listener socket for p2p connections
      ObjectOutputStream outputStream ;
      ObjectInputStream inputStream ;
      int peerID;
@@ -22,7 +23,8 @@ public class Client {
     // For the individual connections, again you can re-use the Connection class, and add some event handlers to process event codes that will be used to distibguis betwwen peer-to-peer or cleint-server communications, or create a separate class called peerConnection. It is completely your choice.
     public static void main(String args[])
     {
-        
+        //TODO: Test with args at SVSU, delete next line
+        args = new String[]{"-c", "project3_template/clientconfig1.txt"};
         Client client = new Client();
         boolean runClient=true;
         Scanner input = new Scanner(System.in);
@@ -41,6 +43,7 @@ public class Client {
             client.s = new Socket(client.ip, client.serverPort); 
             client.outputStream = new ObjectOutputStream(client.s.getOutputStream());
             client.inputStream = new ObjectInputStream(client.s.getInputStream());
+            client.clientListener = new ServerSocket(client.peer_listen_port);
             System.out.println("Connected to Server ..." +client.s); 
 
             Packet p = new Packet();
