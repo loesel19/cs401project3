@@ -76,6 +76,8 @@ public class Client {
                     System.out.println("Enter the file index you want ");
                     int findex = input.nextInt();
                     client.send_req_for_file(findex);
+                    //TODO: implement requesting file from another peer
+
                     break;
 
                     default:
@@ -185,6 +187,7 @@ public class Client {
         p.peer_listen_port=peer_listen_port;
         p.req_file_index=findex;
         send_packet_to_server(p);
+        //TODO: get packet from server here with the info of the client who has this file
         //disconnect();
 
     }
