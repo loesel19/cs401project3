@@ -18,9 +18,16 @@ public class Client {
      int peerID;
      int peer_listen_port;
      char FILE_VECTOR[];
-    // To do , create each peers own ServerSocket listener to monitor for incoming peer requests. start a listener thread in main();
-    // I used the ServerSocketHandler to handle both client-server and peer-to-peer listeners. You can use a separate class. 90% of the code is repeated.
-    // For the individual connections, again you can re-use the Connection class, and add some event handlers to process event codes that will be used to distibguis betwwen peer-to-peer or cleint-server communications, or create a separate class called peerConnection. It is completely your choice.
+    // To do , create each peers own ServerSocket listener to monitor for incoming peer requests. start a listener
+    // thread in main() I used the ServerSocketHandler to handle both client-server and peer-to-peer listeners.
+    // You can use a separate class. 90% of the code is repeated. For the individual connections, again you can
+    // re-use the Connection class, and add some event handlers to process event codes that will be used to
+    // distinguish between peer-to-peer or client-server communications, or create a separate class called
+    // peerConnection. It is completely your choice.
+    public Client(){
+        serverPort = 34546; //port number for p2p clients in the same office
+
+    }
     public static void main(String args[])
     {
         //TODO: Test with args at SVSU, delete next line
@@ -58,7 +65,12 @@ public class Client {
             
             Thread r = new PacketHandler(client);
             r.start();
-            
+
+            //create a new Server socket to listen for incoming client connections
+            client.clientListener = new ServerSocket(client.serverPort);
+            //start a new client socket handler
+
+
             
             while (runClient){
                 
@@ -76,7 +88,6 @@ public class Client {
                     System.out.println("Enter the file index you want ");
                     int findex = input.nextInt();
                     client.send_req_for_file(findex);
-                    //TODO: implement requesting file from another peer
 
                     break;
 
