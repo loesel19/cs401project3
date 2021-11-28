@@ -12,7 +12,7 @@ public class Client {
      int serverPort;
      InetAddress ip=null; 
      Socket s;
-     ServerSocket clientListener; //listener socket for p2p connections
+     ServerSocket ss; //listener socket for p2p connections
      ObjectOutputStream outputStream ;
      ObjectInputStream inputStream ;
      int peerID;
@@ -50,7 +50,7 @@ public class Client {
             client.s = new Socket(client.ip, client.serverPort); 
             client.outputStream = new ObjectOutputStream(client.s.getOutputStream());
             client.inputStream = new ObjectInputStream(client.s.getInputStream());
-            client.clientListener = new ServerSocket(client.peer_listen_port);
+            client.ss = new ServerSocket(client.peer_listen_port);
             System.out.println("Connected to Server ..." +client.s); 
 
             Packet p = new Packet();
@@ -67,9 +67,9 @@ public class Client {
             r.start();
 
             //create a new Server socket to listen for incoming client connections
-            client.clientListener = new ServerSocket(client.serverPort);
-            //start a new client socket handler
-
+            client.ss = new ServerSocket(client.serverPort);
+            //start a new socket handler
+            ServerSocketHandler clientHandler = new ServerSocketHandler(client);
 
             
             while (runClient){
@@ -241,8 +241,7 @@ class PacketHandler extends Thread
 
     }
 
-    void process_packet_from_server(Packet p)
-    {
+    void process_packet_from_server(Packet p) throws IOException {
      int e = p.event_type;
 
      switch (e)
@@ -265,11 +264,10 @@ class PacketHandler extends Thread
 
     }
     
-    void PeerToPeerHandler(InetAddress remotePeerIP, int remotePortNum, int remotePeerID, int findex)
-    {
+    void PeerToPeerHandler(InetAddress remotePeerIP, int remotePortNum, int remotePeerID, int findex) throws IOException {
         // To implement.
-        
-        // connect to peer
+
+
         // while file not received correctly
             // request_file_from_peer
             // receive_file_from_peer

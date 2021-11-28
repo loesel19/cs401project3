@@ -13,8 +13,16 @@ class Connection extends Thread
     int peerID;
     InetAddress peerIP;
     char FILE_VECTOR[];
-    ArrayList<Connection> connectionList;    
+    ArrayList<Connection> connectionList;
     boolean runFlag=true;
+
+    //peer connection parameters
+    boolean isClient = false; //is this a peer to peer connection
+    InetAddress remotePeerIP;
+    int remotePortNum;
+    int remotePeerID;
+    int findex;
+    Client recClient;
 
     public Connection(Socket socket, ArrayList<Connection> connectionList) throws IOException
     {
@@ -25,6 +33,15 @@ class Connection extends Thread
         this.peerIP=socket.getInetAddress();
         this.peerPort=socket.getPort();
         
+    }
+
+    /**
+     * no args constructor, called for client Connection
+     */
+    public Connection(Socket clientSocket, Client client){
+        socket = clientSocket;
+        this.recClient = client;
+        isClient = true;
     }
 
     @Override
