@@ -21,6 +21,7 @@ class Connection extends Thread
     //peer connection parameters
     boolean isClient = false; //is this a peer to peer connection
     Client recClient;
+    boolean messHash = true;
 
     public Connection(Socket socket, ArrayList<Connection> connectionList) throws IOException
     {
@@ -179,12 +180,11 @@ public void clientReqFileFromPeer(Packet p) throws IOException, ClassNotFoundExc
                     packet.sender = this.peerID;
                     packet.recipient = p.sender;
                     packet.DATA_BLOCK = generate_file(findex, 64);
-                    packet.fileHash = find_file_hash(packet.DATA_BLOCK);
                     packet.event_type = 4;
                     outputStream.writeObject(packet);
                     outputStream.flush();
                     System.out.println("sent packet " + i + " to " + packet.recipient);
-                    Thread.sleep(500);
+                    Thread.sleep(1000);
                 } else {
                     packet = (Packet) inputStream.readObject();
                     System.out.println("got response from sender");
@@ -204,7 +204,7 @@ public void clientReqFileFromPeer(Packet p) throws IOException, ClassNotFoundExc
                         socket.close();
                         break;
                     } else {
-                        i = 0;
+                        i = -1;
                         System.out.println("Negative Ack Received, retransmitting File");
                     }
                 }
@@ -230,7 +230,20 @@ public void clientReqFileFromPeer(Packet p) throws IOException, ClassNotFoundExc
        Packet packet = new Packet();
         packet.event_type=2;
         packet.req_file_index=findex;
+        if (!messHash)
         packet.fileHash = find_file_hash(generate_file(findex, 64));
+        else{
+            while(true) {
+                String temp = find_file_hash(generate_file(findex, 64));
+                temp = temp + "ff";
+                if (!temp.equals(find_file_hash(generate_file(findex,64)))) {
+                    System.out.println("***Generated incorrect file hash");
+                    messHash = false;
+                    packet.fileHash = temp;
+                    break;
+                }
+            }
+        }
 
          for (int i=0;i<connectionList.size();i++)
         {

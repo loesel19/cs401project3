@@ -259,7 +259,7 @@ class PacketHandler extends Thread
         else{
             System.out.println("Server says that peer "+p.peerID+" on listening port "+p.peer_listen_port+" has file "+p.req_file_index);
             System.out.println(p.fileHash);
-            PeerToPeerHandler(p.peerIP,p.peer_listen_port,p.req_file_index,p.req_file_index); // TO DO
+            PeerToPeerHandler(p.peerIP,p.peer_listen_port,p.req_file_index,p.req_file_index, p.fileHash); // TO DO
             }
         break;
          case 3:
@@ -280,7 +280,7 @@ class PacketHandler extends Thread
         }
     }
     
-    void PeerToPeerHandler(InetAddress remotePeerIP, int remotePortNum, int remotePeerID, int findex) throws IOException, ClassNotFoundException {
+    void PeerToPeerHandler(InetAddress remotePeerIP, int remotePortNum, int remotePeerID, int findex, String fileHash) throws IOException, ClassNotFoundException {
         // To implement.
 
 System.out.println("inside peerToPeerHandler");
@@ -301,7 +301,7 @@ System.out.println("inside peerToPeerHandler");
             pack = (Packet) is.readObject();
             process_packet_from_client(pack, i);
             // verify file_hash
-            if (i == 19 && pack.fileHash.equals(find_file_hash(generate_file(findex, 64)))) {
+            if (i == 19 && fileHash.equals(find_file_hash(generate_file(findex, 64)))) {
                 // if correct, send positve ack, break
                 Packet res = new Packet();
                 res.sender = pack.recipient;
@@ -314,7 +314,7 @@ System.out.println("inside peerToPeerHandler");
                 //now update file vector so we dont ask for this file again
                 client.FILE_VECTOR[findex] = '1';
                 break;
-            } else if (i == 19 && !(pack.fileHash.equals(find_file_hash(generate_file(findex,64))))){
+            } else if (i == 19 && !(fileHash.equals(find_file_hash(generate_file(findex,64))))){
                 // if incorrect, send negative ack, loop back
                 Packet res = new Packet();
                 res.sender = client.peerID;
@@ -324,6 +324,7 @@ System.out.println("inside peerToPeerHandler");
                 res.gotFile = false;
                 os.writeObject(res);
                 System.out.println("incorrect File Hash, sending negative ACK");
+                i = -1;
             }
         }
 
