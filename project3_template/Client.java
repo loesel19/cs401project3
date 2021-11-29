@@ -12,7 +12,8 @@ public class Client {
      int serverPort;
      InetAddress ip=null; 
      Socket s;
-     ServerSocket ss; //listener socket for p2p connections
+     Socket peerSocket;
+     ServerSocket ss; //listener socket for p2p connection
      ObjectOutputStream outputStream ;
      ObjectInputStream inputStream ;
      int peerID;
@@ -25,13 +26,13 @@ public class Client {
     // distinguish between peer-to-peer or client-server communications, or create a separate class called
     // peerConnection. It is completely your choice.
     public Client(){
-        serverPort = 34546; //port number for p2p clients in the same office
+
 
     }
     public static void main(String args[])
     {
         //TODO: Test with args at SVSU, delete next line
-        args = new String[]{"-c", "project3_template/clientconfig1.txt"};
+      //  args = new String[]{"-c", "project3_template/clientconfig1.txt"};
         Client client = new Client();
         boolean runClient=true;
         Scanner input = new Scanner(System.in);
@@ -67,9 +68,16 @@ public class Client {
             r.start();
 
             //create a new Server socket to listen for incoming client connections
-            client.ss = new ServerSocket(client.serverPort);
-            //start a new socket handler
-            ServerSocketHandler clientHandler = new ServerSocketHandler(client);
+            try {
+                //start a new socket handler
+                System.out.println("listen port: " + client.peer_listen_port);
+                ServerSocketHandler clientHandler = new ServerSocketHandler(client);
+                clientHandler.start();
+            }catch (Exception e){
+                e.printStackTrace();
+        }
+
+
 
             
             while (runClient){
@@ -198,7 +206,6 @@ public class Client {
         p.peer_listen_port=peer_listen_port;
         p.req_file_index=findex;
         send_packet_to_server(p);
-        //TODO: get packet from server here with the info of the client who has this file
         //disconnect();
 
     }
@@ -241,7 +248,7 @@ class PacketHandler extends Thread
 
     }
 
-    void process_packet_from_server(Packet p) throws IOException {
+    void process_packet_from_server(Packet p) throws IOException, ClassNotFoundException {
      int e = p.event_type;
 
      switch (e)
@@ -251,6 +258,7 @@ class PacketHandler extends Thread
             System.out.println("Server says that no client has file "+p.req_file_index);
         else{
             System.out.println("Server says that peer "+p.peerID+" on listening port "+p.peer_listen_port+" has file "+p.req_file_index);
+            System.out.println(p.fileHash);
             PeerToPeerHandler(p.peerIP,p.peer_listen_port,p.req_file_index,p.req_file_index); // TO DO
             }
         break;
@@ -264,21 +272,104 @@ class PacketHandler extends Thread
 
     }
     
-    void PeerToPeerHandler(InetAddress remotePeerIP, int remotePortNum, int remotePeerID, int findex) throws IOException {
+    void PeerToPeerHandler(InetAddress remotePeerIP, int remotePortNum, int remotePeerID, int findex) throws IOException, ClassNotFoundException {
         // To implement.
 
-
+System.out.println("inside peerToPeerHandler");
         // while file not received correctly
-            // request_file_from_peer
-            // receive_file_from_peer
+        client.peerSocket = new Socket(remotePeerIP, remotePortNum);
+        System.out.println("created socket to peer " + client.peerSocket);
+        //now we ask the client for the file we want
+        Packet p = makeRequestPacket(remotePeerIP, remotePortNum, remotePeerID, findex);
+        // request_file_from_peer
+        ObjectOutputStream os = new ObjectOutputStream(client.peerSocket.getOutputStream());
+        ObjectInputStream is= new ObjectInputStream(client.peerSocket.getInputStream());
+        os.writeObject(p);
+        os.flush();
+        System.out.println("Wrote out packet");
+        // receive_file_from_peer
+        Packet pack = null;
+        for (int i = 0; i < 20; i++) {
+            pack = (Packet) is.readObject();
+            System.out.println("received packet " + i + " from " + pack.sender);
             // verify file_hash
-            // if correct, send positve ack, break
-            // if incorrect, send negative ack, loop back
+            if (i == 19 && pack.fileHash.equals(find_file_hash(generate_file(findex, 64)))) {
+                // if correct, send positve ack, break
+                Packet res = new Packet();
+                res.sender = client.peerID;
+                res.recipient = pack.sender;
+                res.peerIP = client.peerSocket.getInetAddress();
+                res.event_type = 4;
+                res.gotFile = true;
+                os.writeObject(res);
+                System.out.println("got file, sent positive ACK");
+                break;
+            } else if (i == 19 && !(pack.fileHash.equals(find_file_hash(generate_file(findex,64))))){
+                // if incorrect, send negative ack, loop back
+                Packet res = new Packet();
+                res.sender = client.peerID;
+                res.recipient = pack.sender;
+                res.peerIP = client.peerSocket.getInetAddress();
+                res.event_type = 4;
+                res.gotFile = false;
+                os.writeObject(res);
+                System.out.println("incorrect File Hash, sending negative ACK");
+            }
+        }
+
+
             
         //once, file has been received, send update file request to server.
         
     }
+public Packet makeRequestPacket(InetAddress remotePeerIP, int remotePortNum, int remotePeerID, int findex){
+    Packet p = new Packet();
+    p.event_type = 4;
+    p.sender = client.peerID;
+    p.recipient = remotePeerID;
+    p.peerIP = client.ip;
+    p.peer_listen_port = client.peer_listen_port;
+    p.FILE_VECTOR = client.FILE_VECTOR;
+    p.req_file_index = findex;
+    return p;
+}
+    public byte[] generate_file(int findex, int length)
+    {
+        byte[] buf= new byte[length];
+        Random r = new Random();
+        r.setSeed(findex);
+        r.nextBytes(buf);
+        try{
+            System.out.println(SHAsum(buf));
+        }
+        catch (Exception e){System.out.println("SHA1 error!");}
+        return buf;
+    }
 
+    public String find_file_hash(byte [] buf)
+    {
+        String h = "";
+        try {
+            h = SHAsum(buf);
+        } catch (NoSuchAlgorithmException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        return h;
+    }
+
+    public String SHAsum(byte[] convertme) throws NoSuchAlgorithmException{
+        MessageDigest md = MessageDigest.getInstance("SHA-1");
+        return byteArray2Hex(md.digest(convertme));
+    }
+
+    private static String byteArray2Hex(byte[] hash) {
+        Formatter formatter = new Formatter();
+        for (byte b : hash) {
+            formatter.format("%02x", b);
+        }
+        return formatter.toString();
+    }
 
 
 }

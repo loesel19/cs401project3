@@ -19,7 +19,12 @@ class ServerSocketHandler extends Thread
         this.connectionList=connectionList;
     }
 
+    /**
+     * this will be the constructor to open a server socket for a client, takes the client as input
+     * @param client
+     */
     public ServerSocketHandler(Client client){
+        System.out.println("clients constructor for ServerSocketHandler");
         this.client = client;
         isClient = true;
     }
@@ -27,6 +32,7 @@ class ServerSocketHandler extends Thread
     public void run() {
         Socket clientSocket;
         if (isClient) {
+            System.out.println("client " + client.peerID + " opened up a listening socket");
             while (true) {
                 clientSocket = null;
                 try{

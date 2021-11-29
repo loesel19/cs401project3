@@ -1,5 +1,7 @@
 import java.io.*;
 import java.net.*;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -23,6 +25,7 @@ class Connection extends Thread
     int remotePeerID;
     int findex;
     Client recClient;
+    int sendNum = 0;
 
     public Connection(Socket socket, ArrayList<Connection> connectionList) throws IOException
     {
@@ -38,31 +41,68 @@ class Connection extends Thread
     /**
      * no args constructor, called for client Connection
      */
-    public Connection(Socket clientSocket, Client client){
+    public Connection(Socket clientSocket, Client client) throws IOException {
         socket = clientSocket;
         this.recClient = client;
         isClient = true;
+        this.inputStream = new ObjectInputStream(clientSocket.getInputStream());
+        this.outputStream = new ObjectOutputStream(clientSocket.getOutputStream());
+        this.peerIP = clientSocket.getInetAddress();
+        this.peerPort = clientSocket.getPort();
+        System.out.println("Client connection opened");
     }
 
     @Override
     public void run() {
         //wait for register packet.
-        Packet p= new Packet();
+        if (!isClient) {
+            Packet p = new Packet();
 
-        try {p = (Packet) inputStream.readObject();}
-        catch (Exception e) {System.out.println("Could not register client");return;} 
-        eventHandler(p);
-        
-        while (runFlag){
-            try { 
-                //printConnections();
+            try {
                 p = (Packet) inputStream.readObject();
+            } catch (Exception e) {
+                System.out.println("Could not register client");
+                return;
+            }
+            try {
                 eventHandler(p);
-               // p.printPacket();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            while (runFlag) {
+                try {
+                    //printConnections();
+                    p = (Packet) inputStream.readObject();
+                    eventHandler(p);
+                    // p.printPacket();
+
+                } catch (Exception e) {
+                    break;
+                }
 
             }
-            catch (Exception e) {break;}
+        }else{
+            System.out.println("This is a clients connection");
+            Packet p = new Packet();
+            try{
+                p = (Packet) inputStream.readObject();
+                System.out.println("***received client packet");
+                eventHandler(p);
 
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            while(runFlag){
+                try {
+                    p = (Packet) inputStream.readObject();
+                    eventHandler(p);
+                } catch (Exception e) {
+                    System.out.println("Connection has been closed");
+                    break;
+                }
+
+            }
         }
 
     }
@@ -111,8 +151,7 @@ class Connection extends Thread
         send_packet_to_client(p);
     }
 
-    public void eventHandler(Packet p)
-    {
+    public void eventHandler(Packet p) throws IOException, ClassNotFoundException, InterruptedException {
         int event_type = p.event_type;
         switch (event_type)
         {
@@ -128,11 +167,45 @@ class Connection extends Thread
             case 3:
             clientGotFile(p);break; // To Do
             
-           // case 4: //if implementing peer-to-peer connections in the same class
-           //  clientReqFileFromPeer(p);break;
+            case 4:
+             clientReqFileFromPeer(p);break;
         };
     }
+public void clientReqFileFromPeer(Packet p) throws IOException, ClassNotFoundException, InterruptedException {
+        System.out.println("Client " + p.sender + " is requesting file " + p.req_file_index);
+        int findex = p.req_file_index;
+        Packet packet = null;
+        try {
+            for (int i = 0; i <= 20; i++) {
+                if (i != 20) {
+                    packet = new Packet();
+                    packet.sender = p.recipient;
+                    packet.recipient = p.sender;
+                    packet.DATA_BLOCK = generate_file(findex, 64);
+                    packet.fileHash = find_file_hash(packet.DATA_BLOCK);
+                    packet.event_type = 4;
+                    outputStream.writeObject(packet);
+                    outputStream.flush();
+                    System.out.println("sent packet " + i + " to " + packet.recipient);
+                    Thread.sleep(500);
+                } else {
+                    packet = (Packet) inputStream.readObject();
+                    System.out.println("got response from sender");
+                    if (packet.gotFile) {
+                        System.out.println("Positive Ack Received, closing connection...");
 
+                        socket.close();
+                        break;
+                    } else {
+                        i = 0;
+                        System.out.println("Negative Ack Received, retransmitting File");
+                    }
+                }
+            }
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+}
     public void clientRegister(Packet p)
     {
         FILE_VECTOR=p.FILE_VECTOR;
@@ -150,6 +223,7 @@ class Connection extends Thread
        Packet packet = new Packet();
         packet.event_type=2;
         packet.req_file_index=findex;
+        packet.fileHash = find_file_hash(generate_file(findex, 64));
 
          for (int i=0;i<connectionList.size();i++)
         {
@@ -191,6 +265,43 @@ class Connection extends Thread
      public void clientGotFile(Packet p)
     {
        // To implement
+    }
+    public byte[] generate_file(int findex, int length)
+    {
+        byte[] buf= new byte[length];
+        Random r = new Random();
+        r.setSeed(findex);
+        r.nextBytes(buf);
+        try{
+            //System.out.println(SHAsum(buf));
+        }
+        catch (Exception e){System.out.println("SHA1 error!");}
+        return buf;
+    }
+
+    public String find_file_hash(byte [] buf)
+    {
+        String h = "";
+        try {
+            h = SHAsum(buf);
+        } catch (NoSuchAlgorithmException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        return h;
+    }
+
+    public String SHAsum(byte[] convertme) throws NoSuchAlgorithmException {
+        MessageDigest md = MessageDigest.getInstance("SHA-1");
+        return byteArray2Hex(md.digest(convertme));
+    }
+
+    private static String byteArray2Hex(byte[] hash) {
+        Formatter formatter = new Formatter();
+        for (byte b : hash) {
+            formatter.format("%02x", b);
+        }
+        return formatter.toString();
     }
 
 }
