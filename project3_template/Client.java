@@ -262,6 +262,8 @@ class PacketHandler extends Thread
             PeerToPeerHandler(p.peerIP,p.peer_listen_port,p.req_file_index,p.req_file_index); // TO DO
             }
         break;
+         case 3:
+             client.FILE_VECTOR = p.FILE_VECTOR;
 
         case 6: //server wants to quit. I should too.
             System.out.println("Server wants to quit. I should too! ");
@@ -270,6 +272,12 @@ class PacketHandler extends Thread
 
      }
 
+    }
+    void process_packet_from_client(Packet p, int i){
+        switch (p.event_type){
+            case(4):
+                System.out.println("received packet " + i + " from " + p.sender);
+        }
     }
     
     void PeerToPeerHandler(InetAddress remotePeerIP, int remotePortNum, int remotePeerID, int findex) throws IOException, ClassNotFoundException {
@@ -291,18 +299,20 @@ System.out.println("inside peerToPeerHandler");
         Packet pack = null;
         for (int i = 0; i < 20; i++) {
             pack = (Packet) is.readObject();
-            System.out.println("received packet " + i + " from " + pack.sender);
+            process_packet_from_client(pack, i);
             // verify file_hash
             if (i == 19 && pack.fileHash.equals(find_file_hash(generate_file(findex, 64)))) {
                 // if correct, send positve ack, break
                 Packet res = new Packet();
-                res.sender = client.peerID;
+                res.sender = pack.recipient;
                 res.recipient = pack.sender;
                 res.peerIP = client.peerSocket.getInetAddress();
                 res.event_type = 4;
                 res.gotFile = true;
                 os.writeObject(res);
                 System.out.println("got file, sent positive ACK");
+                //now update file vector so we dont ask for this file again
+                client.FILE_VECTOR[findex] = '1';
                 break;
             } else if (i == 19 && !(pack.fileHash.equals(find_file_hash(generate_file(findex,64))))){
                 // if incorrect, send negative ack, loop back

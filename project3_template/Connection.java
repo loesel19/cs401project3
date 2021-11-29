@@ -20,12 +20,7 @@ class Connection extends Thread
 
     //peer connection parameters
     boolean isClient = false; //is this a peer to peer connection
-    InetAddress remotePeerIP;
-    int remotePortNum;
-    int remotePeerID;
-    int findex;
     Client recClient;
-    int sendNum = 0;
 
     public Connection(Socket socket, ArrayList<Connection> connectionList) throws IOException
     {
@@ -45,6 +40,7 @@ class Connection extends Thread
         socket = clientSocket;
         this.recClient = client;
         isClient = true;
+        this.peerID = client.peerID;//
         this.inputStream = new ObjectInputStream(clientSocket.getInputStream());
         this.outputStream = new ObjectOutputStream(clientSocket.getOutputStream());
         this.peerIP = clientSocket.getInetAddress();
@@ -165,6 +161,7 @@ class Connection extends Thread
             clientWantsToQuit(p);break;
             
             case 3:
+                System.out.println("case 3");
             clientGotFile(p);break; // To Do
             
             case 4:
@@ -179,7 +176,7 @@ public void clientReqFileFromPeer(Packet p) throws IOException, ClassNotFoundExc
             for (int i = 0; i <= 20; i++) {
                 if (i != 20) {
                     packet = new Packet();
-                    packet.sender = p.recipient;
+                    packet.sender = this.peerID;
                     packet.recipient = p.sender;
                     packet.DATA_BLOCK = generate_file(findex, 64);
                     packet.fileHash = find_file_hash(packet.DATA_BLOCK);
@@ -192,8 +189,18 @@ public void clientReqFileFromPeer(Packet p) throws IOException, ClassNotFoundExc
                     packet = (Packet) inputStream.readObject();
                     System.out.println("got response from sender");
                     if (packet.gotFile) {
-                        System.out.println("Positive Ack Received, closing connection...");
-
+                        System.out.println("Positive Ack Received, updating server...");
+                        //client got file, lets update the server
+                        outputStream = recClient.outputStream;
+                        Packet res = new Packet();
+                        res.req_file_index = findex;
+                        res.event_type = 3;
+                        res.sender = packet.recipient;
+                        res.peerID = packet.sender;
+                        System.out.println(res.peerID  + "****");
+                        outputStream.writeObject(res);
+                        outputStream.flush();
+                        System.out.println("Closing peer connection....");
                         socket.close();
                         break;
                     } else {
@@ -264,7 +271,11 @@ public void clientReqFileFromPeer(Packet p) throws IOException, ClassNotFoundExc
     
      public void clientGotFile(Packet p)
     {
+        System.out.println("Updating FileVector index " + p.req_file_index + " for client " + p.peerID);
        // To implement
+        int index = searchForClient(p.peerID);
+        connectionList.get(index).FILE_VECTOR[p.req_file_index] = '1';
+
     }
     public byte[] generate_file(int findex, int length)
     {
