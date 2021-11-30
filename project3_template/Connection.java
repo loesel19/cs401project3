@@ -21,7 +21,7 @@ class Connection extends Thread
     //peer connection parameters
     boolean isClient = false; //is this a peer to peer connection
     Client recClient;
-    boolean messHash = true;
+    boolean messHash = true; //if true the hash for the file will be messed up by the server
 
     public Connection(Socket socket, ArrayList<Connection> connectionList) throws IOException
     {
@@ -71,6 +71,7 @@ class Connection extends Thread
                 try {
                     //printConnections();
                     p = (Packet) inputStream.readObject();
+                    System.out.println("received packet from " + p.sender);
                     eventHandler(p);
                     // p.printPacket();
 
@@ -172,39 +173,38 @@ class Connection extends Thread
 public void clientReqFileFromPeer(Packet p) throws IOException, ClassNotFoundException, InterruptedException {
         System.out.println("Client " + p.sender + " is requesting file " + p.req_file_index);
         int findex = p.req_file_index;
+        int lastBysteIndex = 0; //holds the last byte sent of the file
+        byte temp[] = generate_file(findex, 20000); //generate a file of length 20000 bytes
         Packet packet = null;
         try {
-            for (int i = 0; i <= 20; i++) {
+            for (int i = 0; i  <= 20; i++) {
                 if (i != 20) {
                     packet = new Packet();
                     packet.sender = this.peerID;
                     packet.recipient = p.sender;
-                    packet.DATA_BLOCK = generate_file(findex, 64);
+                    byte send[] = new byte[1000];
+                    int sendIndex = 0;
+                    while(sendIndex < p.data_block_size){
+                        send[sendIndex] = temp[lastBysteIndex];
+                        sendIndex++;
+                        lastBysteIndex++;
+                    }
+                    packet.DATA_BLOCK = send;
                     packet.event_type = 4;
                     outputStream.writeObject(packet);
                     outputStream.flush();
                     System.out.println("sent packet " + i + " to " + packet.recipient);
                     Thread.sleep(1000);
-                } else {
+                } else if (i == 20){
+                    System.out.println("awaiting ack...");
                     packet = (Packet) inputStream.readObject();
                     System.out.println("got response from sender");
                     if (packet.gotFile) {
-                        System.out.println("Positive Ack Received, updating server...");
-                        //client got file, lets update the server
-                        outputStream = recClient.outputStream;
-                        Packet res = new Packet();
-                        res.req_file_index = findex;
-                        res.event_type = 3;
-                        res.sender = packet.recipient;
-                        res.peerID = packet.sender;
-                        System.out.println(res.peerID  + "****");
-                        outputStream.writeObject(res);
-                        outputStream.flush();
+                        System.out.println("Positive Ack Received!");
                         System.out.println("Closing peer connection....");
                         socket.close();
                         break;
                     } else {
-                        i = -1;
                         System.out.println("Negative Ack Received, retransmitting File");
                     }
                 }
@@ -231,12 +231,12 @@ public void clientReqFileFromPeer(Packet p) throws IOException, ClassNotFoundExc
         packet.event_type=2;
         packet.req_file_index=findex;
         if (!messHash)
-        packet.fileHash = find_file_hash(generate_file(findex, 64));
+        packet.fileHash = find_file_hash(generate_file(findex, 20000));
         else{
             while(true) {
-                String temp = find_file_hash(generate_file(findex, 64));
+                String temp = find_file_hash(generate_file(findex, 20000));
                 temp = temp + "ff";
-                if (!temp.equals(find_file_hash(generate_file(findex,64)))) {
+                if (!temp.equals(find_file_hash(generate_file(findex,20000)))) {
                     System.out.println("***Generated incorrect file hash");
                     messHash = false;
                     packet.fileHash = temp;
@@ -244,6 +244,7 @@ public void clientReqFileFromPeer(Packet p) throws IOException, ClassNotFoundExc
                 }
             }
         }
+        System.out.println(packet.fileHash);
 
          for (int i=0;i<connectionList.size();i++)
         {
