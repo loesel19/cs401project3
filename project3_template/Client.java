@@ -87,7 +87,7 @@ public class Client {
                 switch(cmd)
                 {
                     case 'q':
-                    System.out.println("Getting ready to quit ..." +client.s); 
+                    System.out.println("Getting ready to quit ..." +client.s);
                     client.send_quit_to_server();
                     runClient=false;
                     break;
@@ -111,6 +111,8 @@ public class Client {
             e.printStackTrace(); 
         }
 
+        client.disconnect();
+        System.exit(0);
     }
 
     void send_packet_to_server(Packet p)
@@ -285,6 +287,8 @@ class PacketHandler extends Thread
 
 System.out.println("inside peerToPeerHandler");
         // while file not received correctly
+        boolean fileReceived = false;
+
         client.peerSocket = new Socket(remotePeerIP, remotePortNum);
         System.out.println("created socket to peer " + client.peerSocket);
         //now we ask the client for the file we want
@@ -295,55 +299,59 @@ System.out.println("inside peerToPeerHandler");
         os.writeObject(p);
         os.flush();
         System.out.println("Wrote out packet");
-        // receive_file_from_peer
-        byte file[] = new byte[20000]; // byte array to hold incoming file
-        int receivedFileIndex = 0; //index of the file received
-        Packet pack = null;
-        for (int i = 0; i < 20; i++) {
-            pack = (Packet) is.readObject();
-            process_packet_from_client(pack, i);
-            byte[] recvFileChunk = pack.DATA_BLOCK;
-            int readIndex = 0; //index of file we are reading in
-            while(readIndex < pack.data_block_size){
-                file[receivedFileIndex] = recvFileChunk[readIndex];
-                readIndex++;
-                receivedFileIndex++;
-            }
-            // verify file_hash
-            if (i == 19 && fileHash.equals(find_file_hash(file))) {
-                System.out.println(fileHash + "  from server");
-                System.out.println(find_file_hash(file) + "  our hash");
-                // if correct, send positve ack, break
-                Packet res = new Packet();
-                res.sender = client.peerID;
-                res.recipient = pack.sender;
-                res.peerIP = client.peerSocket.getInetAddress();
-                res.event_type = 3;
-                res.gotFile = true;
-                os.writeObject(res);
-                System.out.println("got file, sent positive ACK");
-                //now update file vector so we dont ask for this file again
-                client.FILE_VECTOR[findex] = '1';
-                //and send a packet to Server saying we got the file
-                res.event_type = 3;
-                res.peerID = client.peerID;
-                res.req_file_index = findex;
-                System.out.println("sent packet to server with event type 3");
-                client.send_packet_to_server(res);
-                break;
-            } else if (i == 19 && !(fileHash.equals(find_file_hash(file)))){
-                // if incorrect, send negative ack, loop back
-                System.out.println(fileHash + "  from server");
-                System.out.println(find_file_hash(file) + "  our hash");
-                Packet res = new Packet();
-                res.sender = client.peerID;
-                res.recipient = pack.sender;
-                res.peerIP = client.peerSocket.getInetAddress();
-                res.event_type = 4;
-                res.gotFile = false;
-                os.writeObject(res);
-                System.out.println("incorrect File Hash, sending negative ACK");
-                client.send_req_for_file(findex);
+
+        while (!fileReceived) {
+            // receive_file_from_peer
+            byte file[] = new byte[20000]; // byte array to hold incoming file
+            int receivedFileIndex = 0; //index of the file received
+            Packet pack = null;
+            for (int i = 0; i < 20; i++) {
+                pack = (Packet) is.readObject();
+                process_packet_from_client(pack, i);
+                byte[] recvFileChunk = pack.DATA_BLOCK;
+                int readIndex = 0; //index of file we are reading in
+                while (readIndex < pack.data_block_size) {
+                    file[receivedFileIndex] = recvFileChunk[readIndex];
+                    readIndex++;
+                    receivedFileIndex++;
+                }
+                // verify file_hash
+                if (i == 19 && fileHash.equals(find_file_hash(file))) {
+                    System.out.println(fileHash + "  from server");
+                    System.out.println(find_file_hash(file) + "  our hash");
+                    // if correct, send positve ack, break
+                    Packet res = new Packet();
+                    res.sender = client.peerID;
+                    res.recipient = pack.sender;
+                    res.peerIP = client.peerSocket.getInetAddress();
+                    res.event_type = 3;
+                    res.gotFile = true;
+                    os.writeObject(res);
+                    System.out.println("got file, sent positive ACK");
+                    //now update file vector so we dont ask for this file again
+                    client.FILE_VECTOR[findex] = '1';
+                    //and send a packet to Server saying we got the file
+                    res.event_type = 3;
+                    res.peerID = client.peerID;
+                    res.req_file_index = findex;
+                    System.out.println("sent packet to server with event type 3");
+                    client.send_packet_to_server(res);
+                    fileReceived = true;
+                    break;
+                } else if (i == 19 && !(fileHash.equals(find_file_hash(file)))) {
+                    // if incorrect, send negative ack, loop back
+                    System.out.println(fileHash + "  from server");
+                    System.out.println(find_file_hash(file) + "  our hash");
+                    Packet res = new Packet();
+                    res.sender = client.peerID;
+                    res.recipient = pack.sender;
+                    res.peerIP = client.peerSocket.getInetAddress();
+                    res.event_type = 4;
+                    res.gotFile = false;
+                    os.writeObject(res);
+                    System.out.println("incorrect File Hash, sending negative ACK");
+                    // client.send_req_for_file(findex);
+                }
             }
         }
 

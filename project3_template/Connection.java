@@ -173,44 +173,49 @@ class Connection extends Thread
 public void clientReqFileFromPeer(Packet p) throws IOException, ClassNotFoundException, InterruptedException {
         System.out.println("Client " + p.sender + " is requesting file " + p.req_file_index);
         int findex = p.req_file_index;
-        int lastBysteIndex = 0; //holds the last byte sent of the file
-        byte temp[] = generate_file(findex, 20000); //generate a file of length 20000 bytes
-        Packet packet = null;
-        try {
-            for (int i = 0; i  <= 20; i++) {
-                if (i != 20) {
-                    packet = new Packet();
-                    packet.sender = this.peerID;
-                    packet.recipient = p.sender;
-                    byte send[] = new byte[1000];
-                    int sendIndex = 0;
-                    while(sendIndex < p.data_block_size){
-                        send[sendIndex] = temp[lastBysteIndex];
-                        sendIndex++;
-                        lastBysteIndex++;
-                    }
-                    packet.DATA_BLOCK = send;
-                    packet.event_type = 4;
-                    outputStream.writeObject(packet);
-                    outputStream.flush();
-                    System.out.println("sent packet " + i + " to " + packet.recipient);
-                    Thread.sleep(1000);
-                } else if (i == 20){
-                    System.out.println("awaiting ack...");
-                    packet = (Packet) inputStream.readObject();
-                    System.out.println("got response from sender");
-                    if (packet.gotFile) {
-                        System.out.println("Positive Ack Received!");
-                        System.out.println("Closing peer connection....");
-                        socket.close();
-                        break;
-                    } else {
-                        System.out.println("Negative Ack Received, retransmitting File");
+        boolean fileReceived = false;
+
+        while(!fileReceived) {
+            int lastBysteIndex = 0; //holds the last byte sent of the file
+            byte temp[] = generate_file(findex, 20000); //generate a file of length 20000 bytes
+            Packet packet = null;
+            try {
+                for (int i = 0; i <= 20; i++) {
+                    if (i != 20) {
+                        packet = new Packet();
+                        packet.sender = this.peerID;
+                        packet.recipient = p.sender;
+                        byte send[] = new byte[1000];
+                        int sendIndex = 0;
+                        while (sendIndex < p.data_block_size) {
+                            send[sendIndex] = temp[lastBysteIndex];
+                            sendIndex++;
+                            lastBysteIndex++;
+                        }
+                        packet.DATA_BLOCK = send;
+                        packet.event_type = 4;
+                        outputStream.writeObject(packet);
+                        outputStream.flush();
+                        System.out.println("sent packet " + i + " to " + packet.recipient);
+                        Thread.sleep(1000);
+                    } else if (i == 20) {
+                        System.out.println("awaiting ack...");
+                        packet = (Packet) inputStream.readObject();
+                        System.out.println("got response from sender");
+                        if (packet.gotFile) {
+                            System.out.println("Positive Ack Received!");
+                            System.out.println("Closing peer connection....");
+                            socket.close();
+                            fileReceived = true;
+                            break;
+                        } else {
+                            System.out.println("Negative Ack Received, retransmitting File");
+                        }
                     }
                 }
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-        }catch (Exception e){
-            e.printStackTrace();
         }
 }
     public void clientRegister(Packet p)
@@ -230,20 +235,20 @@ public void clientReqFileFromPeer(Packet p) throws IOException, ClassNotFoundExc
        Packet packet = new Packet();
         packet.event_type=2;
         packet.req_file_index=findex;
-        if (!messHash)
+//        if (!messHash)
         packet.fileHash = find_file_hash(generate_file(findex, 20000));
-        else{
-            while(true) {
-                String temp = find_file_hash(generate_file(findex, 20000));
-                temp = temp + "ff";
-                if (!temp.equals(find_file_hash(generate_file(findex,20000)))) {
-                    System.out.println("***Generated incorrect file hash");
-                    messHash = false;
-                    packet.fileHash = temp;
-                    break;
-                }
-            }
-        }
+//        else{
+//            while(true) {
+//                String temp = find_file_hash(generate_file(findex, 20000));
+//                temp = temp + "ff";
+//                if (!temp.equals(find_file_hash(generate_file(findex,20000)))) {
+//                    System.out.println("***Generated incorrect file hash");
+//                    messHash = false;
+//                    packet.fileHash = temp;
+//                    break;
+//                }
+//            }
+//        }
         System.out.println(packet.fileHash);
 
          for (int i=0;i<connectionList.size();i++)
