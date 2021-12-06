@@ -4,8 +4,8 @@ import java.net.*;
 import java.util.*;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.concurrent.*;
-import java.lang.*; 
+import java.lang.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Client {
 
@@ -19,6 +19,8 @@ public class Client {
      int peerID;
      int peer_listen_port;
      char FILE_VECTOR[];
+     AtomicBoolean receiving = new AtomicBoolean(false);
+
     // To do , create each peers own ServerSocket listener to monitor for incoming peer requests. start a listener
     // thread in main() I used the ServerSocketHandler to handle both client-server and peer-to-peer listeners.
     // You can use a separate class. 90% of the code is repeated. For the individual connections, again you can
@@ -93,6 +95,10 @@ public class Client {
                     break;
 
                     case 'f':
+                        if(client.receiving.get()) {
+                            System.out.println("There is already a file retrieval in progress. Please wait until that process finishes before requesting another file.");
+                            break;
+                        }
                     System.out.println("Enter the file index you want ");
                     int findex = input.nextInt();
                     client.send_req_for_file(findex);
@@ -288,6 +294,7 @@ class PacketHandler extends Thread
 System.out.println("inside peerToPeerHandler");
         // while file not received correctly
         boolean fileReceived = false;
+        client.receiving.set(true);
 
         client.peerSocket = new Socket(remotePeerIP, remotePortNum);
         System.out.println("created socket to peer " + client.peerSocket);
@@ -355,7 +362,7 @@ System.out.println("inside peerToPeerHandler");
             }
         }
 
-
+        client.receiving.set(false);
             
         //once, file has been received, send update file request to server.
         
