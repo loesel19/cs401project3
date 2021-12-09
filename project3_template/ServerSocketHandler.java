@@ -32,6 +32,7 @@ class ServerSocketHandler extends Thread
     public void run() {
         Socket clientSocket;
         if (isClient) {
+            this.connectionList = new ArrayList<>();
             System.out.println("client " + client.peerID + " opened up a listening socket");
             while (true) {
                 clientSocket = null;
@@ -41,7 +42,13 @@ class ServerSocketHandler extends Thread
                     System.out.println("IP : " + clientSocket.getInetAddress().toString());
                     //start the connection
                     Connection conn = new Connection(clientSocket, client);
+                    connectionList.add(conn);
                     conn.start();
+
+                } catch (SocketException e) {
+                    System.out.println("Shutting down Client....");
+                    quit();
+                    break;
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -77,4 +84,13 @@ class ServerSocketHandler extends Thread
         }
     }
 
+    public void quit() {
+        // send a message to all peers that I want to quit.
+        for (Connection c : connectionList) {
+            if(c == null) return;
+            c.send_client_quit_message();
+            c.closeConnection();
+        }
+        connectionList.clear();
+    }
 }

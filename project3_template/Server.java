@@ -10,7 +10,7 @@ public class Server {
     int MAX_CONNECTED_CLIENTS;
     ServerSocket listener;
     int numClients;
-    ArrayList<Connection> connectionList;
+    volatile ArrayList<Connection> connectionList;
 
     
     public Server(){

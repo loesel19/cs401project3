@@ -9,17 +9,18 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Client {
 
-     int serverPort;
-     InetAddress ip=null; 
-     Socket s;
-     Socket peerSocket;
-     ServerSocket ss; //listener socket for p2p connection
-     ObjectOutputStream outputStream ;
-     ObjectInputStream inputStream ;
-     int peerID;
-     int peer_listen_port;
-     char FILE_VECTOR[];
-     AtomicBoolean receiving = new AtomicBoolean(false);
+    int serverPort;
+    InetAddress ip=null;
+    Socket s;
+    Socket peerSocket;
+    ServerSocket ss; //listener socket for p2p connection
+    ObjectOutputStream outputStream ;
+    ObjectInputStream inputStream ;
+    int peerID;
+    int peer_listen_port;
+    char FILE_VECTOR[];
+    AtomicBoolean receiving = new AtomicBoolean(false);
+    ServerSocketHandler clientHandler;
 
     // To do , create each peers own ServerSocket listener to monitor for incoming peer requests. start a listener
     // thread in main() I used the ServerSocketHandler to handle both client-server and peer-to-peer listeners.
@@ -73,8 +74,8 @@ public class Client {
             try {
                 //start a new socket handler
                 System.out.println("listen port: " + client.peer_listen_port);
-                ServerSocketHandler clientHandler = new ServerSocketHandler(client);
-                clientHandler.start();
+                client.clientHandler = new ServerSocketHandler(client);
+                client.clientHandler.start();
             }catch (Exception e){
                 e.printStackTrace();
         }
@@ -220,12 +221,14 @@ public class Client {
 
     void disconnect()
     {
-        try { 
-                outputStream.close();
-                inputStream.close();
-                s.close();
-                System.out.println("Closed Socket");
-            }
+        try {
+            clientHandler.quit();
+            ss.close();
+            outputStream.close();
+            inputStream.close();
+            s.close();
+            System.out.println("Closed Socket");
+        }
         catch (Exception e) { System.out.println("Couldn't close socket!");}
     }
 }
@@ -256,36 +259,43 @@ class PacketHandler extends Thread
 
     }
 
+    //FIXME: does not receive server closing packet when sending and receiving at same time
     void process_packet_from_server(Packet p) throws IOException, ClassNotFoundException {
      int e = p.event_type;
 
-     switch (e)
-     {
-        case 2: //server reply for req. file
-        if (p.peerID==-1)
-            System.out.println("Server says that no client has file "+p.req_file_index);
-        else{
-            System.out.println("Server says that peer "+p.peerID+" on listening port "+p.peer_listen_port+" has file "+p.req_file_index);
-            System.out.println(p.fileHash);
-            PeerToPeerHandler(p.peerIP,p.peer_listen_port,p.req_file_index,p.req_file_index, p.fileHash); // TO DO
-            }
-        break;
-         case 3:
-             client.FILE_VECTOR = p.FILE_VECTOR;
-
-        case 6: //server wants to quit. I should too.
-            System.out.println("Server wants to quit. I should too! ");
-            client.disconnect();
-           System.exit(0);
+        switch (e)
+        {
+            case 2: //server reply for req. file
+                if (p.peerID==-1)
+                    System.out.println("Server says that no client has file "+p.req_file_index);
+                else{
+                    System.out.println("Server says that peer "+p.peerID+" on listening port "+p.peer_listen_port+" has file "+p.req_file_index);
+                    System.out.println(p.fileHash);
+                    PeerToPeerHandler(p.peerIP,p.peer_listen_port,p.req_file_index,p.req_file_index, p.fileHash); // TO DO
+                }
+                break;
+            case 3:
+                client.FILE_VECTOR = p.FILE_VECTOR;
+                break;
+            case 6: //server wants to quit. I should too.
+                System.out.println("Server wants to quit. I should too! ");
+                client.disconnect();
+                System.exit(0);
 
      }
 
     }
-    void process_packet_from_client(Packet p, int i){
+    boolean process_packet_from_client(Packet p, int i){
         switch (p.event_type){
             case(4):
                 System.out.println("received packet " + i + " from " + p.sender);
+                break;
+            case(5):
+                System.out.println("Peer" + p.peerID + " quit. Canceling file retrieval.");
+                client.receiving.set(false);
+                return false;
         }
+        return true;
     }
     
     void PeerToPeerHandler(InetAddress remotePeerIP, int remotePortNum, int remotePeerID, int findex, String fileHash) throws IOException, ClassNotFoundException {
@@ -314,7 +324,10 @@ System.out.println("inside peerToPeerHandler");
             Packet pack = null;
             for (int i = 0; i < 20; i++) {
                 pack = (Packet) is.readObject();
-                process_packet_from_client(pack, i);
+
+                //process packet from client returns false when the peer is quitting
+                if(!process_packet_from_client(pack, i)) return;
+
                 byte[] recvFileChunk = pack.DATA_BLOCK;
                 int readIndex = 0; //index of file we are reading in
                 while (readIndex < pack.data_block_size) {

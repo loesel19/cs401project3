@@ -149,6 +149,12 @@ class Connection extends Thread
         send_packet_to_client(p);
     }
 
+    void send_client_quit_message(){
+        Packet p = new Packet();
+        p.event_type = 5;
+        send_packet_to_client(p);
+    }
+
     public void eventHandler(Packet p) throws IOException, ClassNotFoundException, InterruptedException {
         int event_type = p.event_type;
         switch (event_type)
@@ -213,6 +219,9 @@ public void clientReqFileFromPeer(Packet p) throws IOException, ClassNotFoundExc
                         }
                     }
                 }
+            }catch (SocketException e){
+                System.out.println("Peer disconnected, stopping transmission");
+                break;
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -267,6 +276,7 @@ public void clientReqFileFromPeer(Packet p) throws IOException, ClassNotFoundExc
 
     }
 
+    //FIXME: Doesn't always remove clients if they quit at the same time
     public void clientWantsToQuit(Packet p)
     {
         //remove client from list. close thread.
