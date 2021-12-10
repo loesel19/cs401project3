@@ -281,13 +281,34 @@ class PacketHandler extends Thread
      }
 
     }
+
+    /**
+     * this method takes in the packet, the index of the file frame received and prints it out
+     * if the event type is 4
+     * @param p
+     * @param i
+     */
     void process_packet_from_client(Packet p, int i){
         switch (p.event_type){
             case(4):
                 System.out.println("received packet " + i + " from " + p.sender);
         }
     }
-    
+
+    /**
+     * this method takes in the the port number and ip address of the sender, and the the file index
+     * of the file we are receiving, and then sends a request packet to a peer who has the file,
+     * receives the 20 packets containing the 1000 bytes per packet, and then checks the hash of
+     * the received file with the hash given by the server, and if they match we send a positive ack,
+     * if hashes dont match we send a negative ack and restart the process
+     * @param remotePeerIP
+     * @param remotePortNum
+     * @param remotePeerID
+     * @param findex
+     * @param fileHash
+     * @throws IOException
+     * @throws ClassNotFoundException
+     */
     void PeerToPeerHandler(InetAddress remotePeerIP, int remotePortNum, int remotePeerID, int findex, String fileHash) throws IOException, ClassNotFoundException {
         // To implement.
 
@@ -367,7 +388,16 @@ System.out.println("inside peerToPeerHandler");
         //once, file has been received, send update file request to server.
         
     }
-public Packet makeRequestPacket(InetAddress remotePeerIP, int remotePortNum, int remotePeerID, int findex){
+
+    /**
+     * here we create a packet to request a file from a peer whom the server says have the file we want
+     * @param remotePeerIP
+     * @param remotePortNum
+     * @param remotePeerID
+     * @param findex
+     * @return
+     */
+    public Packet makeRequestPacket(InetAddress remotePeerIP, int remotePortNum, int remotePeerID, int findex){
     Packet p = new Packet();
     p.event_type = 4;
     p.sender = client.peerID;
@@ -378,6 +408,7 @@ public Packet makeRequestPacket(InetAddress remotePeerIP, int remotePortNum, int
     p.req_file_index = findex;
     return p;
 }
+    //next 4 methods given by Avishek Mukherjee to generate a file and file hash
     public byte[] generate_file(int findex, int length)
     {
         byte[] buf= new byte[length];
@@ -390,6 +421,7 @@ public Packet makeRequestPacket(InetAddress remotePeerIP, int remotePortNum, int
         catch (Exception e){System.out.println("SHA1 error!");}
         return buf;
     }
+
 
     public String find_file_hash(byte [] buf)
     {

@@ -35,7 +35,9 @@ class Connection extends Thread
     }
 
     /**
-     * no args constructor, called for client Connection
+     * this constructor will be called when a client opens up a connection, notice the isClient
+     * boolean is set to true here. we also assign the input and output streams to the ones
+     * associated with the client socket instead of the server-client socket
      */
     public Connection(Socket clientSocket, Client client) throws IOException {
         socket = clientSocket;
@@ -49,6 +51,10 @@ class Connection extends Thread
         System.out.println("Client connection opened");
     }
 
+    /**
+     * if the connection is a client connection we handle it similarly to server client communications
+     * if it is not a client connection we handle it in the same way as project 2
+     */
     @Override
     public void run() {
         //wait for register packet.
@@ -170,7 +176,21 @@ class Connection extends Thread
              clientReqFileFromPeer(p);break;
         };
     }
-public void clientReqFileFromPeer(Packet p) throws IOException, ClassNotFoundException, InterruptedException {
+
+    /**
+     * this is the method where we send the packet to the peer requesting the file.
+     * we while the receiver has not sent a positive ack we run through a for loop sending the
+     * 20 segments of the file to the receiver. when we receive a positive ack we close down the peer
+     * to peer connection
+     * --the file is generated before the inner for loop, and inside the for loop we have a
+     * while loop that will map 1000 bytes of the file to a 1000 byte array that we can send in
+     * the packet as data
+     * @param p
+     * @throws IOException
+     * @throws ClassNotFoundException
+     * @throws InterruptedException
+     */
+    public void clientReqFileFromPeer(Packet p) throws IOException, ClassNotFoundException, InterruptedException {
         System.out.println("Client " + p.sender + " is requesting file " + p.req_file_index);
         int findex = p.req_file_index;
         boolean fileReceived = false;
