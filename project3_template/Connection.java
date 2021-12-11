@@ -276,16 +276,26 @@ public void clientReqFileFromPeer(Packet p) throws IOException, ClassNotFoundExc
 
     }
 
-    //FIXME: Doesn't always remove clients if they quit at the same time
     public void clientWantsToQuit(Packet p)
     {
         //remove client from list. close thread.
-        int clientPos=searchForClient(p.sender);
+        Connection clientConnection = searchForClientConnection(p.sender);
+        if(clientConnection == null) return;
         System.out.println("Removing client "+p.sender);
-        connectionList.remove(clientPos);
+        connectionList.remove(clientConnection);
         System.out.println("Total Registered Clients : "+connectionList.size() );
         closeConnection();
 
+    }
+
+    public Connection searchForClientConnection(int ID)
+    {
+        for (int i=0;i<connectionList.size();i++)
+        {
+            if (connectionList.get(i).peerID==ID)
+                return connectionList.get(i);
+        }
+        return null;
     }
 
     public int searchForClient(int ID)
